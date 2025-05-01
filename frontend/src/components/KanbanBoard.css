@@ -1,0 +1,70 @@
+.kanban-container {
+  padding: 20px;
+}
+
+.kanban-column {
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  min-height: 350px;
+  padding: 8px;
+}
+
+.kanban-column-header {
+  font-weight: 600;
+  text-align: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #e9ecef;
+  margin-bottom: 10px;
+}
+
+.candidate-card {
+  background-color: white;
+  border-radius: 4px;
+  padding: 10px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  transition: box-shadow 0.3s ease;
+}
+
+.candidate-card:hover {
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.candidate-name {
+  font-weight: 500;
+  margin-bottom: 5px;
+}
+
+.score-dots {
+  display: flex;
+  align-items: center;
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 3px;
+}
+
+.dot.filled {
+  background-color: #28a745;
+}
+
+.dot.empty {
+  background-color: #f8f9fa;
+  border: 1px solid #28a745;
+}
+
+/* Estilos para responsive */
+@media (max-width: 992px) {
+  .kanban-column {
+    margin-bottom: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .kanban-container {
+    padding: 10px;
+  }
+} 
