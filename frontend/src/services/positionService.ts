@@ -36,8 +36,8 @@ interface CandidateStageUpdate {
 // Funciones para las llamadas API
 export const getPositionInterviewFlow = async (positionId: string): Promise<PositionInterviewFlow> => {
   try {
-    const response = await axios.get(`${API_URL}/positions/${positionId}/interviewFlow`);
-    return response.data;
+    const response = await axios.get(`${API_URL}/position/${positionId}/interviewFlow`);
+      return response.data;
   } catch (error) {
     console.error('Error al obtener el flujo de entrevistas:', error);
     throw error;
@@ -46,7 +46,7 @@ export const getPositionInterviewFlow = async (positionId: string): Promise<Posi
 
 export const getPositionCandidates = async (positionId: string): Promise<Candidate[]> => {
   try {
-    const response = await axios.get(`${API_URL}/positions/${positionId}/candidates`);
+    const response = await axios.get(`${API_URL}/position/${positionId}/candidates`);
     return response.data;
   } catch (error) {
     console.error('Error al obtener los candidatos:', error);
