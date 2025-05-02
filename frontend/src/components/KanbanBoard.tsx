@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Alert } from 'react-bootstrap';
-import { ArrowLeft } from 'react-bootstrap-icons';
+import { Container, Row, Col, Card, Button, Alert, Badge } from 'react-bootstrap';
+import { ArrowLeft, Star, StarFill } from 'react-bootstrap-icons';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getPositionInterviewFlow } from '../services/positionService';
+import { getPositionInterviewFlow, getPositionCandidates } from '../services/positionService';
 import './KanbanBoard.css';
 
 // Interfaces actualizadas para reflejar la estructura real
@@ -31,6 +31,14 @@ interface InterviewFlowResponse {
   };
 }
 
+// Interfaz para candidatos
+interface Candidate {
+  id?: string;
+  fullName: string;
+  currentInterviewStep: string;
+  averageScore: number;
+}
+
 interface Position {
   positionName: string;
   interviewSteps: InterviewStep[];
@@ -40,11 +48,12 @@ const KanbanBoard: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   
-  // Estados simplificados
+  // Estados 
   const [position, setPosition] = useState<Position>({
     positionName: "Cargando...",
     interviewSteps: []
   });
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<any>({});
@@ -122,6 +131,9 @@ const KanbanBoard: React.FC = () => {
           interviewSteps: steps
         });
         
+        // Cargar candidatos
+        await fetchCandidates(id, steps);
+        
       } catch (err: any) {
         console.error("Error:", err);
         setError(err.message || "Error desconocido al cargar los datos");
@@ -130,8 +142,72 @@ const KanbanBoard: React.FC = () => {
       }
     };
 
+    // Función para obtener los candidatos
+    const fetchCandidates = async (positionId: string, steps: InterviewStep[]) => {
+      try {
+        console.log("Obteniendo candidatos para la posición:", positionId);
+        const candidatesData = await getPositionCandidates(positionId);
+        console.log("Datos de candidatos recibidos:", candidatesData);
+        
+        if (!candidatesData || !Array.isArray(candidatesData) || candidatesData.length === 0) {
+          console.warn("No se encontraron candidatos o datos inválidos");
+          return;
+        }
+        
+        // Procesar los candidatos
+        const processedCandidates = candidatesData.map((candidate: Candidate, index: number) => {
+          // Asegurarnos de que cada candidato tenga un ID
+          const candidateId = candidate.id?.toString() || `candidate-${index}`;
+          
+          // Manejar el paso actual del candidato
+          let currentStep = candidate.currentInterviewStep;
+          
+          // Si currentInterviewStep es un ID en lugar del nombre
+          if (!isNaN(Number(currentStep))) {
+            const stepId = Number(currentStep);
+            const matchingStep = steps.find(step => step.id === stepId);
+            if (matchingStep) {
+              currentStep = matchingStep.name;
+            } else {
+              // Si no encontramos el paso, usamos el primero disponible
+              currentStep = steps[0]?.name || "Paso desconocido";
+            }
+          }
+          
+          return {
+            ...candidate,
+            id: candidateId,
+            currentInterviewStep: currentStep
+          };
+        });
+        
+        console.log("Candidatos procesados:", processedCandidates);
+        setCandidates(processedCandidates);
+        
+      } catch (error) {
+        console.error("Error al obtener candidatos:", error);
+        // No lanzamos error para que siga mostrando los pasos sin candidatos
+      }
+    };
+
     fetchPositionData();
   }, [id]);
+  
+  // Renderizar estrellas para la puntuación
+  const renderScore = (score: number) => {
+    const maxScore = 5;
+    const stars = [];
+    
+    for (let i = 1; i <= maxScore; i++) {
+      if (i <= score) {
+        stars.push(<StarFill key={i} className="text-warning me-1" />);
+      } else {
+        stars.push(<Star key={i} className="text-muted me-1" />);
+      }
+    }
+    
+    return <div className="mt-1">{stars}</div>;
+  };
   
   // Mostrar pantalla de carga
   if (loading) {
@@ -192,6 +268,11 @@ const KanbanBoard: React.FC = () => {
             <ArrowLeft size={24} />
           </Button>
           <h1 className="d-inline-block m-0">{position.positionName}</h1>
+          {candidates.length > 0 && (
+            <Badge bg="primary" className="ms-2">
+              {candidates.length} candidatos
+            </Badge>
+          )}
         </Col>
       </Row>
       
@@ -204,11 +285,14 @@ const KanbanBoard: React.FC = () => {
               <div>
                 <strong>Pasos cargados:</strong> {position.interviewSteps.length}
               </div>
+              <div>
+                <strong>Candidatos cargados:</strong> {candidates.length}
+              </div>
               <Button 
                 variant="secondary" 
                 size="sm" 
                 className="mt-2"
-                onClick={() => console.log('Debug Info:', debugInfo)}
+                onClick={() => console.log('Debug Info:', {position, candidates})}
               >
                 Ver detalles en consola
               </Button>
@@ -219,32 +303,57 @@ const KanbanBoard: React.FC = () => {
       
       {/* Tablero de pasos de entrevista */}
       <Row>
-        {position.interviewSteps.map((step) => (
-          <Col key={step.id} xs={12} md={6} lg={3} className="mb-4">
-            <Card className="h-100 shadow-sm">
-              <Card.Header className="text-center bg-light">
-                {step.name}
-              </Card.Header>
-              <Card.Body className="p-2">
-                <div
-                  style={{
-                    minHeight: '300px',
-                    backgroundColor: '#f8f9fa',
-                    padding: '8px',
-                    borderRadius: '4px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <p className="text-muted">
-                    Paso {step.id}: {step.name}
-                  </p>
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-        ))}
+        {position.interviewSteps.map((step) => {
+          const stepCandidates = candidates.filter(
+            candidate => candidate.currentInterviewStep === step.name
+          );
+          
+          return (
+            <Col key={step.id} xs={12} md={6} lg={3} className="mb-4">
+              <Card className="h-100 shadow-sm">
+                <Card.Header className="text-center bg-light d-flex justify-content-between align-items-center">
+                  <span>{step.name}</span>
+                  {stepCandidates.length > 0 && (
+                    <Badge bg="info" pill>
+                      {stepCandidates.length}
+                    </Badge>
+                  )}
+                </Card.Header>
+                <Card.Body className="p-2">
+                  <div
+                    style={{
+                      minHeight: '300px',
+                      backgroundColor: '#f8f9fa',
+                      padding: '8px',
+                      borderRadius: '4px',
+                      overflowY: 'auto'
+                    }}
+                  >
+                    {stepCandidates.length === 0 ? (
+                      <div className="text-center text-muted p-4">
+                        No hay candidatos en esta etapa
+                      </div>
+                    ) : (
+                      stepCandidates.map(candidate => (
+                        <Card 
+                          key={candidate.id} 
+                          className="mb-2 candidate-card"
+                        >
+                          <Card.Body className="p-2">
+                            <Card.Title className="h6 mb-1">
+                              {candidate.fullName}
+                            </Card.Title>
+                            {renderScore(candidate.averageScore)}
+                          </Card.Body>
+                        </Card>
+                      ))
+                    )}
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
+          );
+        })}
       </Row>
     </Container>
   );

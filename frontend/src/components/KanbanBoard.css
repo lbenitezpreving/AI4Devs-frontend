@@ -23,11 +23,13 @@
   padding: 10px;
   margin-bottom: 10px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
-  transition: box-shadow 0.3s ease;
+  transition: all 0.3s ease;
+  border-left: 3px solid #0d6efd;
 }
 
 .candidate-card:hover {
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .candidate-name {
@@ -67,4 +69,10 @@
   .kanban-container {
     padding: 10px;
   }
+}
+
+/* Estilos para la puntuación de estrellas */
+.score-stars {
+  display: flex;
+  margin-top: 5px;
 } 
