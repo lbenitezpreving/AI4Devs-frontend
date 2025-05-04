@@ -58,6 +58,26 @@
   border: 1px solid #28a745;
 }
 
+/* Estilos para el drag and drop */
+.dragging {
+  opacity: 0.6 !important;
+  transform: scale(1.03);
+  z-index: 10;
+}
+
+.drop-target {
+  background-color: #e9ecef !important;
+  border: 2px dashed #adb5bd;
+}
+
+.draggable-item {
+  cursor: grab;
+}
+
+.draggable-item:active {
+  cursor: grabbing;
+}
+
 /* Estilos para responsive */
 @media (max-width: 992px) {
   .kanban-column {

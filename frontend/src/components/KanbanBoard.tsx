@@ -57,6 +57,7 @@ const KanbanBoard: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<any>({});
+  const [draggedCandidate, setDraggedCandidate] = useState<string | null>(null);
   
   // Efecto para cargar datos
   useEffect(() => {
@@ -193,6 +194,43 @@ const KanbanBoard: React.FC = () => {
     fetchPositionData();
   }, [id]);
   
+  // Funciones para drag and drop con HTML5 nativo
+  const handleDragStart = (candidateId: string) => {
+    setDraggedCandidate(candidateId);
+  };
+  
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault(); // Necesario para permitir soltar
+  };
+  
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetStepName: string) => {
+    e.preventDefault();
+    
+    if (!draggedCandidate) return;
+    
+    // Buscar el candidato arrastrado
+    const candidateToMove = candidates.find(c => c.id === draggedCandidate);
+    
+    if (candidateToMove && candidateToMove.currentInterviewStep !== targetStepName) {
+      console.log(`Moviendo candidato ${draggedCandidate} de ${candidateToMove.currentInterviewStep} a ${targetStepName}`);
+      
+      // Actualizar el estado
+      const updatedCandidates = candidates.map(candidate => {
+        if (candidate.id === draggedCandidate) {
+          return {
+            ...candidate,
+            currentInterviewStep: targetStepName
+          };
+        }
+        return candidate;
+      });
+      
+      setCandidates(updatedCandidates);
+    }
+    
+    setDraggedCandidate(null);
+  };
+  
   // Renderizar estrellas para la puntuación
   const renderScore = (score: number) => {
     const maxScore = 5;
@@ -301,7 +339,7 @@ const KanbanBoard: React.FC = () => {
         </Row>
       )}
       
-      {/* Tablero de pasos de entrevista */}
+      {/* Tablero de pasos de entrevista con drag and drop nativo */}
       <Row>
         {position.interviewSteps.map((step) => {
           const stepCandidates = candidates.filter(
@@ -321,6 +359,9 @@ const KanbanBoard: React.FC = () => {
                 </Card.Header>
                 <Card.Body className="p-2">
                   <div
+                    className="kanban-column"
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDrop(e, step.name)}
                     style={{
                       minHeight: '300px',
                       backgroundColor: '#f8f9fa',
@@ -335,17 +376,21 @@ const KanbanBoard: React.FC = () => {
                       </div>
                     ) : (
                       stepCandidates.map(candidate => (
-                        <Card 
-                          key={candidate.id} 
-                          className="mb-2 candidate-card"
+                        <div 
+                          key={candidate.id}
+                          draggable
+                          onDragStart={() => handleDragStart(candidate.id || '')}
+                          className={`draggable-item ${draggedCandidate === candidate.id ? 'dragging' : ''}`}
                         >
-                          <Card.Body className="p-2">
-                            <Card.Title className="h6 mb-1">
-                              {candidate.fullName}
-                            </Card.Title>
-                            {renderScore(candidate.averageScore)}
-                          </Card.Body>
-                        </Card>
+                          <Card className="mb-2 candidate-card">
+                            <Card.Body className="p-2">
+                              <Card.Title className="h6 mb-1">
+                                {candidate.fullName}
+                              </Card.Title>
+                              {renderScore(candidate.averageScore)}
+                            </Card.Body>
+                          </Card>
+                        </div>
                       ))
                     )}
                   </div>
