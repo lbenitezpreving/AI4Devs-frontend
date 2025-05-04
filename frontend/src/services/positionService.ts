@@ -56,7 +56,7 @@ export const getPositionCandidates = async (positionId: string): Promise<Candida
 
 export const updateCandidateStage = async (candidateId: string, data: CandidateStageUpdate): Promise<any> => {
   try {
-    const response = await axios.put(`${API_URL}/candidates/${candidateId}/stage`, data);
+    const response = await axios.put(`${API_URL}/candidates/${candidateId}`, data);
     return response.data;
   } catch (error) {
     console.error('Error al actualizar la etapa del candidato:', error);

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Alert, Badge } from 'react-bootstrap';
 import { ArrowLeft, Star, StarFill } from 'react-bootstrap-icons';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getPositionInterviewFlow, getPositionCandidates } from '../services/positionService';
+import { getPositionInterviewFlow, getPositionCandidates, updateCandidateStage } from '../services/positionService';
 import './KanbanBoard.css';
 
 // Interfaces actualizadas para reflejar la estructura real
@@ -37,6 +37,7 @@ interface Candidate {
   fullName: string;
   currentInterviewStep: string;
   averageScore: number;
+  applicationId?: string;
 }
 
 interface Position {
@@ -58,6 +59,10 @@ const KanbanBoard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<any>({});
   const [draggedCandidate, setDraggedCandidate] = useState<string | null>(null);
+  
+  // Nuevo estado para controlar las actualizaciones
+  const [updatingCandidates, setUpdatingCandidates] = useState<{[key: string]: boolean}>({});
+  const [updateErrors, setUpdateErrors] = useState<{[key: string]: string}>({});
   
   // Efecto para cargar datos
   useEffect(() => {
@@ -156,9 +161,15 @@ const KanbanBoard: React.FC = () => {
         }
         
         // Procesar los candidatos
-        const processedCandidates = candidatesData.map((candidate: Candidate, index: number) => {
-          // Asegurarnos de que cada candidato tenga un ID
-          const candidateId = candidate.id?.toString() || `candidate-${index}`;
+        const processedCandidates = candidatesData.map((candidate: any, index: number) => {
+          // Asegurarnos de que cada candidato tenga un ID y verificar su formato
+          // NO generar IDs artificiales, sólo usar los proporcionados por el backend
+          const candidateId = candidate.id?.toString() || '';
+          console.log(`Candidato ${index} - ID original:`, candidate.id);
+          
+          // IMPORTANTE: Guardar el ID de la aplicación asociada al candidato
+          const applicationId = candidate.applicationId?.toString() || '';
+          console.log(`Candidato ${index} - ID de aplicación:`, applicationId);
           
           // Manejar el paso actual del candidato
           let currentStep = candidate.currentInterviewStep;
@@ -178,6 +189,7 @@ const KanbanBoard: React.FC = () => {
           return {
             ...candidate,
             id: candidateId,
+            applicationId: applicationId, // Guardar explícitamente el ID de la aplicación
             currentInterviewStep: currentStep
           };
         });
@@ -203,7 +215,7 @@ const KanbanBoard: React.FC = () => {
     e.preventDefault(); // Necesario para permitir soltar
   };
   
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetStepName: string) => {
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>, targetStepName: string) => {
     e.preventDefault();
     
     if (!draggedCandidate) return;
@@ -214,7 +226,7 @@ const KanbanBoard: React.FC = () => {
     if (candidateToMove && candidateToMove.currentInterviewStep !== targetStepName) {
       console.log(`Moviendo candidato ${draggedCandidate} de ${candidateToMove.currentInterviewStep} a ${targetStepName}`);
       
-      // Actualizar el estado
+      // Actualizar el estado localmente primero para UI responsiva
       const updatedCandidates = candidates.map(candidate => {
         if (candidate.id === draggedCandidate) {
           return {
@@ -226,6 +238,78 @@ const KanbanBoard: React.FC = () => {
       });
       
       setCandidates(updatedCandidates);
+      
+      // Marcar este candidato como en actualización
+      setUpdatingCandidates(prev => ({
+        ...prev,
+        [draggedCandidate]: true
+      }));
+      
+      // Intentar actualizar en el backend
+      try {
+        // Buscamos el paso correspondiente en position.interviewSteps
+        const targetStep = position.interviewSteps.find(step => step.name === targetStepName);
+        
+        if (!targetStep) {
+          throw new Error(`No se encontró el paso "${targetStepName}"`);
+        }
+        
+        // Verificar el formato del ID del candidato
+        // Eliminar posibles prefijos como "candidate-" si existen
+        let actualCandidateId = draggedCandidate;
+        if (draggedCandidate.startsWith('candidate-')) {
+          actualCandidateId = draggedCandidate.replace('candidate-', '');
+        }
+        
+        console.log("ID real del candidato para la API:", actualCandidateId);
+        
+        // IMPORTANTE: Obtener el ID de la aplicación correcto del candidato
+        const applicationId = candidateToMove.applicationId || '';
+        console.log("ID de la aplicación para la API:", applicationId);
+        
+        if (!applicationId) {
+          throw new Error("No se pudo obtener el ID de la aplicación para este candidato");
+        }
+        
+        // Datos para la actualización - ahora usamos el ID de aplicación correcto
+        const updateData = {
+          applicationId: applicationId, // Usamos el ID de la aplicación, no el ID del candidato
+          currentInterviewStep: targetStep.id.toString() // El API espera el ID como string, no el nombre
+        };
+        
+        console.log("Enviando actualización al servidor:", updateData);
+        console.log("URL de la petición:", `http://localhost:3010/candidates/${actualCandidateId}`);
+        
+        // Llamar al endpoint con el ID limpio
+        await updateCandidateStage(actualCandidateId, updateData);
+        
+        console.log("Candidato actualizado con éxito en el servidor");
+        
+        // Limpiar error si existe
+        setUpdateErrors(prev => {
+          const newErrors = { ...prev };
+          delete newErrors[draggedCandidate];
+          return newErrors;
+        });
+      } catch (error: any) {
+        console.error("Error al actualizar el candidato:", error);
+        
+        // Guardar el error
+        setUpdateErrors(prev => ({
+          ...prev,
+          [draggedCandidate]: error.message || "Error desconocido"
+        }));
+        
+        // Opcionalmente, podríamos revertir el cambio en la UI
+        // setCandidates(prevCandidates);
+      } finally {
+        // Marcar como no actualizando
+        setUpdatingCandidates(prev => {
+          const newUpdating = { ...prev };
+          delete newUpdating[draggedCandidate];
+          return newUpdating;
+        });
+      }
     }
     
     setDraggedCandidate(null);
@@ -359,7 +443,7 @@ const KanbanBoard: React.FC = () => {
                 </Card.Header>
                 <Card.Body className="p-2">
                   <div
-                    className="kanban-column"
+                    className={`kanban-column ${draggedCandidate ? 'drop-target-hover' : ''}`}
                     onDragOver={handleDragOver}
                     onDrop={(e) => handleDrop(e, step.name)}
                     style={{
@@ -382,12 +466,22 @@ const KanbanBoard: React.FC = () => {
                           onDragStart={() => handleDragStart(candidate.id || '')}
                           className={`draggable-item ${draggedCandidate === candidate.id ? 'dragging' : ''}`}
                         >
-                          <Card className="mb-2 candidate-card">
+                          <Card className={`mb-2 candidate-card ${updatingCandidates[candidate.id || ''] ? 'updating' : ''} ${updateErrors[candidate.id || ''] ? 'update-error' : ''}`}>
                             <Card.Body className="p-2">
                               <Card.Title className="h6 mb-1">
                                 {candidate.fullName}
+                                {updatingCandidates[candidate.id || ''] && (
+                                  <span className="ms-2 text-muted">
+                                    <small>(Actualizando...)</small>
+                                  </span>
+                                )}
                               </Card.Title>
                               {renderScore(candidate.averageScore)}
+                              {updateErrors[candidate.id || ''] && (
+                                <div className="mt-1 text-danger">
+                                  <small>Error: {updateErrors[candidate.id || '']}</small>
+                                </div>
+                              )}
                             </Card.Body>
                           </Card>
                         </div>
